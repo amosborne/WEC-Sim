@@ -514,8 +514,19 @@ classdef bodyClass<handle
                     obj.irrExcitation(w, bemCount, direction, rho, g, dirBins, iH);
                     obj.irfInfAddedMassAndDamping(cicTime, stateSpace, rho, B2B, iH);
                 case {'elevationImport'}
-                    obj.hydroForce.(hfName).userDefinedFe = zeros(length(waveAmpTime(:,2)),obj.dof);   %initializing userDefinedFe for non imported wave cases
-                    obj.userDefinedExcitation(waveAmpTime, dt, direction, rho, g, iH);
+                    totalExcitation = zeros(size(waveAmpTime,1),obj.dof);
+                    for iWave = 1:length(waveObj)
+                        % Retain file samples outside the simulation interval:
+                        % noncausal excitation needs past and future support.
+                        importedWave = waveObj(iWave);
+                        if ~isequal(importedWave.waveAmpTime(:,1),waveAmpTime(:,1))
+                            error('Imported wave components must share the simulation output time grid.');
+                        end
+                        importedElevation = importdata(importedWave.elevationFile);
+                        obj.userDefinedExcitation(importedWave.waveAmpTime, dt, importedWave.direction, rho, g, iH, importedElevation, simu.rampTime);
+                        totalExcitation = totalExcitation + obj.hydroForce.(hfName).userDefinedFe;
+                    end
+                    obj.hydroForce.(hfName).userDefinedFe = totalExcitation;
                     obj.irfInfAddedMassAndDamping(cicTime, stateSpace, rho, B2B, iH);
             end
             if (obj.gbmDOF>0)
@@ -1083,14 +1094,34 @@ classdef bodyClass<handle
             end
         end
            
-        function userDefinedExcitation(obj, waveAmpTime, dt, direction, rho, g, iH)
+        function userDefinedExcitation(obj, waveAmpTime, dt, direction, rho, g, iH, importedElevation, rampTime)
             % Calculated User-Defined wave excitation force with non-causal convolution
             % Used by hydroForcePre
             nDOF = obj.dof;
             hfName = ['hf' num2str(iH)];
             kf = obj.hydroData(iH).hydro_coeffs.excitation.impulse_response_fun.f .* rho .* g;
             kt = obj.hydroData(iH).hydro_coeffs.excitation.impulse_response_fun.t;
-            t =  min(kt):dt:max(kt);
+            t = ceil(min(kt)/dt)*dt:dt:floor(max(kt)/dt)*dt;
+            if isempty(t)
+                error('Excitation IRF support contains no integration samples at the simulation time step.');
+            end
+            if nargin < 9
+                importedElevation = waveAmpTime;
+                rampTime = 0;
+            end
+            queryTime = waveAmpTime(:,1) - t;
+            elevation = interp1(importedElevation(:,1), importedElevation(:,2), queryTime);
+            if rampTime > 0
+                ramp = (1-cos(pi*queryTime/rampTime))/2;
+                ramp(queryTime <= 0) = 0;
+                ramp(queryTime >= rampTime) = 1;
+                elevation(queryTime <= 0) = 0;
+                elevation = elevation .* ramp;
+            end
+            if any(~isfinite(elevation),'all')
+                error('Imported elevation must cover the excitation IRF past/future support outside the simulation interval.');
+            end
+            obj.hydroForce.(hfName).userDefinedFe = zeros(size(waveAmpTime,1),nDOF);
             for ii = 1:nDOF
                 if length(obj.hydroData(iH).simulation_parameters.direction) > 1
                     [X, Y] = meshgrid(kt, obj.hydroData(iH).simulation_parameters.direction);
@@ -1102,7 +1133,12 @@ classdef bodyClass<handle
                 else
                     error('Default wave direction different from hydro database value. Wave direction (waves.direction) should be specified on input file.')
                 end
-                obj.hydroForce.(hfName).userDefinedFe(:,ii) = conv(waveAmpTime(:,2), obj.hydroForce.(hfName).excitationIRF, 'same')*dt;
+                if any(~isfinite(obj.hydroForce.(hfName).excitationIRF))
+                    error('Excitation IRF interpolation is nonfinite at the requested direction or time step.');
+                end
+                % F(t) = integral K(tau)*eta(t-tau) d tau. Explicit times
+                % preserve the zero lag even for asymmetric kernel support.
+                obj.hydroForce.(hfName).userDefinedFe(:,ii) = sum(elevation .* obj.hydroForce.(hfName).excitationIRF,2)*dt;
             end
             obj.hydroForce.(hfName).fExt.re = zeros(1,nDOF);
             obj.hydroForce.(hfName).fExt.im = zeros(1,nDOF);
