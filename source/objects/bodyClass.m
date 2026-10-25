@@ -515,7 +515,8 @@ classdef bodyClass<handle
                     obj.irfInfAddedMassAndDamping(cicTime, stateSpace, rho, B2B, iH);
                 case {'elevationImport'}
                     obj.hydroForce.(hfName).userDefinedFe = zeros(length(waveAmpTime(:,2)),obj.dof);   %initializing userDefinedFe for non imported wave cases
-                    obj.userDefinedExcitation(waveAmpTime, dt, direction, rho, g, iH);
+                    importedElevation = importdata(waves.elevationFile);
+                    obj.userDefinedExcitation(waveAmpTime, dt, direction, rho, g, iH, importedElevation, simu.rampTime);
                     obj.irfInfAddedMassAndDamping(cicTime, stateSpace, rho, B2B, iH);
             end
             if (obj.gbmDOF>0)
@@ -1083,14 +1084,52 @@ classdef bodyClass<handle
             end
         end
            
-        function userDefinedExcitation(obj, waveAmpTime, dt, direction, rho, g, iH)
+        function userDefinedExcitation(obj, waveAmpTime, dt, direction, rho, g, iH, importedElevation, rampTime)
             % Calculated User-Defined wave excitation force with non-causal convolution
             % Used by hydroForcePre
             nDOF = obj.dof;
             hfName = ['hf' num2str(iH)];
             kf = obj.hydroData(iH).hydro_coeffs.excitation.impulse_response_fun.f .* rho .* g;
             kt = obj.hydroData(iH).hydro_coeffs.excitation.impulse_response_fun.t;
+            if nargin < 8
+                % The legacy input is already ramped; do not ramp it again.
+                importedElevation = waveAmpTime;
+                rampTime = 0;
+            elseif nargin < 9
+                rampTime = 0;
+            end
+            if ~isnumeric(importedElevation) || ~ismatrix(importedElevation) || ~isreal(importedElevation) || ...
+                    size(importedElevation,2) < 2 || size(importedElevation,1) < 2 || ...
+                    any(~isfinite(importedElevation(:,1:2)),'all') || ...
+                    ~isscalar(rampTime) || ~isreal(rampTime) || ~isfinite(rampTime) || rampTime < 0 || ...
+                    ~ismatrix(waveAmpTime) || isempty(waveAmpTime) || size(waveAmpTime,2) < 2 || ...
+                    ~isreal(waveAmpTime(:,1)) || any(~isfinite(waveAmpTime(:,1)))
+                error('WECsim:InvalidImportedExcitationData','Imported excitation requires finite time/elevation samples and a nonnegative finite ramp time.');
+            end
+            [historyTime,order] = sort(importedElevation(:,1));
+            if any(diff(historyTime) <= 0)
+                error('WECsim:InvalidImportedExcitationData','Imported elevation sample times must be distinct.');
+            end
+            if ~isscalar(dt) || ~isreal(dt) || ~isfinite(dt) || dt <= 0 || ~isvector(kt) || numel(kt) < 2 || ...
+                    ~isreal(kt) || any(~isfinite(kt)) || ~isreal(kf) || any(~isfinite(kf),'all')
+                error('WECsim:InvalidExcitationKernel','Excitation requires a positive finite time step and finite real kernel data.');
+            end
             t =  min(kt):dt:max(kt);
+            queryTime = waveAmpTime(:,1) - t;
+            if any(queryTime < historyTime(1) | queryTime > historyTime(end),'all')
+                warning('WECsim:ImportedExcitationRecordSupport', ...
+                    'Excitation queries need [%g,%g] s; imported record covers [%g,%g] s. Zero extension is used only outside the complete record; endpoint forces depend on that finite-record assumption.', ...
+                    min(queryTime,[],'all'),max(queryTime,[],'all'),historyTime(1),historyTime(end));
+            end
+            elevation = interp1(historyTime,importedElevation(order,2),queryTime,'linear',0);
+            if rampTime > 0
+                % Match waveElevUser at source time, including its legacy
+                % negative-time cosine extension; add no calm-history clamp.
+                ramp = (1+cos(pi+pi*queryTime/rampTime))/2;
+                ramp(queryTime >= rampTime) = 1;
+                elevation = elevation .* ramp;
+            end
+            obj.hydroForce.(hfName).userDefinedFe = zeros(size(waveAmpTime,1),nDOF);
             for ii = 1:nDOF
                 if length(obj.hydroData(iH).simulation_parameters.direction) > 1
                     [X, Y] = meshgrid(kt, obj.hydroData(iH).simulation_parameters.direction);
@@ -1102,7 +1141,12 @@ classdef bodyClass<handle
                 else
                     error('Default wave direction different from hydro database value. Wave direction (waves.direction) should be specified on input file.')
                 end
-                obj.hydroForce.(hfName).userDefinedFe(:,ii) = conv(waveAmpTime(:,2), obj.hydroForce.(hfName).excitationIRF, 'same')*dt;
+                if any(~isfinite(obj.hydroForce.(hfName).excitationIRF))
+                    error('WECsim:InvalidExcitationKernel','Excitation kernel interpolation is nonfinite at the requested direction or lag.');
+                end
+                % F(t) = dt * sum_tau K(tau)*eta(t-tau), on the unchanged
+                % min(kt):dt:max(kt) lag grid, including asymmetric supports.
+                obj.hydroForce.(hfName).userDefinedFe(:,ii) = sum(elevation .* obj.hydroForce.(hfName).excitationIRF,2)*dt;
             end
             obj.hydroForce.(hfName).fExt.re = zeros(1,nDOF);
             obj.hydroForce.(hfName).fExt.im = zeros(1,nDOF);
