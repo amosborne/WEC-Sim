@@ -408,7 +408,7 @@ classdef waveClass<handle
                     obj.printWaveSpectrumType;
                 case 'elevationImport'
                     fprintf( '\tWave Type                           = Waves with imported wave elevation time-history\n')
-                    fprintf(['\tWave Elevation Time-Series File    	= ' obj.elevationFile '  \n'])
+                    fprintf('\tWave Elevation Time-Series File    	= %s  \n',obj.elevationFile)
             end
         end
 
