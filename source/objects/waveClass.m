@@ -618,7 +618,19 @@ classdef waveClass<handle
                     end
                 case {'ImportedFullDir'}
                     data = importdata(obj.spectrumFile);
-                    obj.phase = 2 * pi * rand([length(obj.fullDirectionalSpectrum.directions),obj.bem.count]);
+                    if isfield(data,'phase')
+                        expectedSize = [numel(data.frequencies),numel(data.directions)];
+                        if ~isnumeric(data.phase) || ~isreal(data.phase) || ...
+                                ~isequal(size(data.phase),expectedSize) || any(~isfinite(data.phase),'all')
+                            error('WECsim:InvalidFullDirectionalPhase', ...
+                                'Full directional phase must be a finite real frequency-by-direction matrix.');
+                        end
+                        freqLoc = data.frequencies >= min(obj.bem.range)/2/pi & ...
+                            data.frequencies <= max(obj.bem.range)/2/pi;
+                        obj.phase = data.phase(freqLoc,:)';
+                    else
+                        obj.phase = 2 * pi * rand([length(obj.fullDirectionalSpectrum.directions),obj.bem.count]);
+                    end
             end
             obj.phase = obj.phase';
         end

@@ -350,7 +350,7 @@ with the IEC TS 62600-2 standard) should satisfy:
 
 :math:`\int_{-\pi}^{\pi} D(f, \theta) \, d\theta = 1`
 
-If specified, wave phase must be a rectangular matrix of size [i,j], where :math:`i` is the number of wave frequencies and :math:`j`
+To prescribe phases, include a variable ``phase`` in the spectrum MAT file. It must be a finite real matrix of size [i,j], where :math:`i` is the number of wave frequencies and :math:`j`
 is the number of directional bins. To generate a random spectra, specifying a single phase seed value (e.g., waves.phaseSeed = 128) is sufficient
 to ensure that the generated wave spectra is repeatable. 
 
