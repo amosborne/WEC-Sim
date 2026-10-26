@@ -49,7 +49,25 @@ All7 allocated non-bus controls passed. The actual before/after arrays are
 retained by Topwater's native-spectral-small-attempt1 evidence. Those are
 synthetic component results, not physical accuracy or combined-head acceptance.
 
-The current combined head, new mean-drift control and actual native-bus fixture
-remain UNEXECUTED pending independent review. Full packet low-frequency/seam/
-interpolation handoff, force/startup/motion comparison, performance and broader
-MATLAB compatibility remain separate. No runtime pin or upstream promotion.
+Combined validation passed on Windows/R2025b at exact scientific-source head
+8ee8dcb199f21a08cf81e61bfab141d0b0624364: all9 controls and the portable actual-
+block example passed in172.475s. Supplied phase error was0; maximum field error
+1.11e-16m; native-function/physical-force difference1.33e-15; actual bus matched
+the native function exactly and the physical sum within1.33e-15. The mean-drift
+control passed its1e-10 assertions; no separate raw MD roundoff maximum is claimed.
+Local retained Topwater evidence: `native-spectral-combined-attempt1/check/`
+contains acceptance, report, raw arrays, test results and transcript. These local
+artifacts are not shipped in this fork. Later documentation changes do not alter
+that exact tested scientific source.
+
+The transcript retains the generic coarse-direction coverage warning: the
+synthetic headings are deliberately sparse, and every test query is at an
+explicit coefficient node. This does not qualify off-grid interpolation or
+physical BEM resolution. The native "200m for visualization" message accompanies
+infinite-water setup; the deep-water flag remains enabled and no finite-depth
+hydrodynamics is introduced. Warnings were not suppressed or treated as proof of
+broader accuracy.
+
+Full packet low-frequency/seam/interpolation handoff, actual force/startup/motion
+comparison, performance and broader MATLAB compatibility remain separate. No
+runtime pin or upstream promotion.
