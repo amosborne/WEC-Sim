@@ -178,9 +178,7 @@ for m = 1:hydro(F).Nb
     
     if fileID ~= -1
         % Hydrostatics.dat files present, read them
-        raw = textscan(fileID,'%[^\n\r]');
-        raw = raw{:};
-        fclose(fileID);
+        raw = read_lines(fileID);
         for i=1:3
             tmp = textscan(raw{i},'%s %s %f %s %s %s %f');
             hydro(F).cb(i,m) = tmp{3};  % Center of buoyancy
@@ -219,6 +217,8 @@ else
 end
 
 if fileID ~= -1
+    % The existence probe owns a separate handle from the per-body read.
+    fclose(fileID);
     for m = 1:hydro(F).Nb
         if hydro(F).Nb == 1
             fileID = fopen(fullfile(hydrostatics_dir,'KH.dat'));
@@ -227,9 +227,7 @@ if fileID ~= -1
         end
         
         % KH.dat files present, read them
-        raw = textscan(fileID,'%[^\n\r]');
-        raw = raw{:};
-        fclose(fileID);
+        raw = read_lines(fileID);
         for i = 1:6
             tmp = textscan(raw{i},'%f');
             hydro(F).Khs(i,:,m) = tmp{1,1}(1:6);  % Linear restoring stiffness
@@ -523,6 +521,14 @@ end
 end
 
 %% functions
+function raw = read_lines(fileID)
+% Close this reader's handle on success or failure, never unrelated handles.
+assert(fileID ~= -1,'Could not open hydrostatics sidecar file');
+fileCleanup = onCleanup(@() fclose(fileID));
+raw = textscan(fileID,'%[^\n\r]');
+raw = raw{:};
+end
+
 function [sorted_dofs,inds,reset_tf, nDofs_per_body, split_body_names] = sorted_dof_list(old_dofs, body_names)
 % This function reorders a list of dofs if not in the correct order: 
 %    [body 1 surge, sway, heave, roll, pitch, yaw, gbm, body 2 surge, ...]\
