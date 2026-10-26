@@ -54,12 +54,17 @@ report.weight_only_max_abs_difference = max(abs(actualForce-expectedForceActualP
 report.phase_pass = report.phase_max_abs_difference == 0;
 report.field_pass = report.field_max_abs_difference <= 1e-12 && report.origin_max_abs_difference <= 1e-12;
 report.weight_pass = report.weight_only_max_abs_difference <= 1e-10;
+report.combined_first_order_pass = report.phase_pass && report.field_pass && report.weight_pass ...
+    && report.amplitude_max_abs_difference <= 1e-12 && report.force_max_abs_difference <= 1e-10;
 report.native_bus_executed = runNativeBus;
 if runNativeBus
     busForce = probeFullDirectionalSpectralBus(probe,waves,fixture.time,forkRoot);
     report.native_bus_force = busForce;
     report.bus_vs_native_function_max_abs_difference = max(abs(busForce-actualForce),[],'all');
     report.bus_vs_physical_components_max_abs_difference = max(abs(busForce-expectedForce),[],'all');
+    report.native_bus_pass = report.bus_vs_native_function_max_abs_difference <= 1e-10 ...
+        && report.bus_vs_physical_components_max_abs_difference <= 1e-10;
+    report.combined_pass = report.combined_first_order_pass && report.native_bus_pass;
 end
 save(fullfile(outputDirectory,'arrays.mat'),'fixture','expectedField','expectedForce', ...
     'actualField','actualForce','expectedForceActualPhase','report','-v7');

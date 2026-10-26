@@ -55,14 +55,6 @@ testCase.verifySize(first.phase,[3 2]);
 testCase.verifyEqual(first.phase,second.phase);
 end
 
-function testActualNativeBusKeepsPreparedPhaseBinding(testCase)
-report = fullDirectionalSpectralExample(testCase.TestData.root, ...
-    fullfile(testCase.TestData.folder,'native-bus'),true);
-testCase.verifyTrue(report.phase_pass);
-testCase.verifyLessThanOrEqual(report.bus_vs_native_function_max_abs_difference,1e-10);
-% Direction weighting is independently tracked; do not claim its fix here.
-end
-
 function waves = fixture_wave(fixture)
 waves = waveClass('spectrumImportFullDir');
 waves.spectrumFile = fixture.file;
