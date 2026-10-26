@@ -7,12 +7,13 @@ end
 [~,suffix] = fileparts(tempname(folder));
 model = ['imported_bus_' suffix];
 assert(~bdIsLoaded(model),'Owned signal-fixture name already exists');
-cleanup = onCleanup(@() close_owned(model));
+savedBase = snapshot_base({'fixtureBody','waves','typeNum'});
+cleanup = onCleanup(@() restore_fixture(model,savedBase));
 new_system(model);
-workspace = get_param(model,'ModelWorkspace');
-assignin(workspace,'fixtureBody',body);
-assignin(workspace,'waves',waves);
-assignin(workspace,'typeNum',40);
+% Native WEC uses the base workspace; model workspaces reject waveClass arrays.
+assignin('base','fixtureBody',body);
+assignin('base','waves',waves);
+assignin('base','typeNum',40);
 source = [library '/Rigid Body/Hydrodynamic Body/Wave Diffraction and Excitation Force Calculation'];
 parent = [model '/Excitation'];
 add_block('built-in/Subsystem',parent);
@@ -72,7 +73,7 @@ for j = 1:numel(waves)
     regular(j).direction = 90*(j-1);
     regular(j).setup([1 2],inf,0,time(2)-time(1),numel(time)-1,time',1,1);
 end
-assignin(workspace,'waves',regular);
+assignin('base','waves',regular);
 set_param(parent,'waveGroup',sprintf('waves(1:%d)',numel(regular)));
 set_param(model,'SimulationCommand','update');
 regularCount = branch_count(parent,baseName);
@@ -97,7 +98,7 @@ if rewireControl
     add_line(clone,'Unused1/1','Terminate1/1');
     add_line(clone,'Unused2/1','Terminate2/1');
 end
-assignin(workspace,'waves',waves);
+assignin('base','waves',waves);
 set_param(parent,'waveGroup','waves');
 set_param(model,'SimulationCommand','update');
 restoredCount = branch_count(parent,baseName);
@@ -111,6 +112,9 @@ report = struct('time',data.time(:),'applied',data.signals.values, ...
     'regular_graph_count',regularCount,'restored_count',restoredCount,'native_expression',actual, ...
     'rewired_clone_rejected_without_deletion',customRejected, ...
     'scope','native imported source/Add and replication script; unused variant inputs zero, no body dynamics');
+% Explicit restoration must succeed before reporting success; onCleanup retries
+% the same idempotent restoration if an earlier operation failed.
+restore_fixture(model,savedBase);
 end
 
 function count = branch_count(parent,baseName)
@@ -118,8 +122,47 @@ branches = find_system(parent,'SearchDepth',1,'regexp','on','Name',['^' baseName
 count = numel(branches);
 end
 
-function close_owned(model)
-if bdIsLoaded(model)
-    close_system(model,0);
+function state = snapshot_base(names)
+state = struct('name',{},'existed',{},'value',{});
+for j = 1:numel(names)
+    name = names{j};
+    existed = evalin('base',['exist(''' name ''',''var'') == 1']);
+    value = [];
+    if existed
+        value = evalin('base',name);
+    end
+    state(j) = struct('name',name,'existed',existed,'value',{value});
+end
+end
+
+function restore_fixture(model,state)
+failures = {};
+try
+    if bdIsLoaded(model)
+        close_system(model,0);
+    end
+catch failure
+    failures{end+1} = failure.message;
+end
+% Attempt every owned variable even if model close or another restore fails.
+for j = 1:numel(state)
+    name = state(j).name;
+    try
+        if state(j).existed
+            assignin('base',name,state(j).value);
+        else
+            evalin('base',['clear(''' name ''')']);
+        end
+        existed = evalin('base',['exist(''' name ''',''var'') == 1']);
+        assert(existed == state(j).existed,'Fixture variable existence was not restored');
+        if existed
+            assert(isequaln(evalin('base',name),state(j).value),'Fixture variable value was not restored');
+        end
+    catch failure
+        failures{end+1} = [name ': ' failure.message];
+    end
+end
+if ~isempty(failures)
+    error('WECsim:ImportedFixtureCleanup','Owned fixture cleanup failed: %s',strjoin(failures,'; '));
 end
 end
