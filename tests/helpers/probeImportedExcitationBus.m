@@ -118,10 +118,31 @@ restore_fixture(model,savedBase);
 end
 
 function count = branch_count(parent,baseName)
-branches = find_system(parent,'SearchDepth',1,'LookUnderMasks','all','FollowLinks','on', ...
-    'MatchFilter',@Simulink.match.allVariants,'Type','Block', ...
-    'regexp','on','Name',['^' baseName '[0-9]*$']);
-count = numel(branches);
+% RegExp applies to property filters too; discover canonical block handles
+% literally, then apply the branch-name expression separately.
+blocks = find_system(parent,'FindAll','on','SearchDepth',1, ...
+    'LookUnderMasks','all','FollowLinks','on','MatchFilter',@Simulink.match.allVariants, ...
+    'RegExp','off','Type','block');
+children = [];
+names = {};
+paths = {};
+for k = 1:numel(blocks)
+    if strcmp(get_param(blocks(k),'Parent'),parent)
+        children(end+1) = blocks(k);
+        names{end+1} = get_param(blocks(k),'Name');
+        paths{end+1} = getfullname(blocks(k));
+    end
+end
+base = getSimulinkBlockHandle([parent '/' baseName]);
+assert(base ~= -1 && any(children == base),'WECsim:FixtureBranchDiscovery', ...
+    ['Known native base branch missing from literal child-block query. Parent=' ...
+    parent '; discovered=' strjoin(paths,' | ')]);
+pattern = ['^' regexptranslate('escape',baseName) '[0-9]*$'];
+matched = ~cellfun(@isempty,regexp(names,pattern,'once'));
+count = nnz(matched);
+assert(count > 0,'WECsim:FixtureBranchDiscovery', ...
+    ['No actual child branch names matched. Parent=' parent '; names=' ...
+    strjoin(names,' | ') '; paths=' strjoin(paths,' | ')]);
 end
 
 function state = snapshot_base(names)
