@@ -514,9 +514,21 @@ classdef bodyClass<handle
                     obj.irrExcitation(w, bemCount, direction, rho, g, dirBins, iH);
                     obj.irfInfAddedMassAndDamping(cicTime, stateSpace, rho, B2B, iH);
                 case {'elevationImport'}
-                    obj.hydroForce.(hfName).userDefinedFe = zeros(length(waveAmpTime(:,2)),obj.dof);   %initializing userDefinedFe for non imported wave cases
-                    importedElevation = importdata(waves.elevationFile);
-                    obj.userDefinedExcitation(waveAmpTime, dt, direction, rho, g, iH, importedElevation, simu.rampTime);
+                    totalExcitation = zeros(size(waveAmpTime,1),obj.dof);
+                    for iWave = 1:numel(waveObj)
+                        importedWave = waveObj(iWave);
+                        if ~strcmp(importedWave.type,'elevationImport')
+                            error('WECsim:MixedImportedExcitation','All Wave-Spectra should be the same type as waves(1).');
+                        end
+                        if ~isequal(importedWave.waveAmpTime(:,1),waveAmpTime(:,1))
+                            error('WECsim:ImportedExcitationOutputGrid','Imported wave components must share the simulation output time grid.');
+                        end
+                        importedElevation = importdata(importedWave.elevationFile);
+                        obj.userDefinedExcitation(importedWave.waveAmpTime, dt, importedWave.direction, ...
+                            rho, g, iH, importedElevation, simu.rampTime);
+                        totalExcitation = totalExcitation + obj.hydroForce.(hfName).userDefinedFe;
+                    end
+                    obj.hydroForce.(hfName).userDefinedFe = totalExcitation;
                     obj.irfInfAddedMassAndDamping(cicTime, stateSpace, rho, B2B, iH);
             end
             if (obj.gbmDOF>0)
