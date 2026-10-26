@@ -118,7 +118,9 @@ restore_fixture(model,savedBase);
 end
 
 function count = branch_count(parent,baseName)
-branches = find_system(parent,'SearchDepth',1,'regexp','on','Name',['^' baseName '[0-9]*$']);
+branches = find_system(parent,'SearchDepth',1,'LookUnderMasks','all','FollowLinks','on', ...
+    'MatchFilter',@Simulink.match.allVariants,'Type','Block', ...
+    'regexp','on','Name',['^' baseName '[0-9]*$']);
 count = numel(branches);
 end
 
