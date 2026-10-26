@@ -33,7 +33,7 @@ field retains the native seeded/random behavior and existing RNG setup. Directio
 weights reproduce waveClass's exact bin rule from the function's existing
 direction vector; no new argument, port, model save or SLX edit is needed.
 
-There are9 focused controls:4 phase controls (supplied physical field, filtering,
+The previously qualified subset has9 controls:4 phase controls (supplied physical field, filtering,
 invalid phases and seeded fallback),3 first-order width controls (0/90deg,
 0/60deg and nonuniform[-60;0;90]deg),1 mean-drift-only control and1 combined
 actual native-bus control. The mean-drift witness zeros oscillatory H, compares
@@ -71,3 +71,35 @@ broader accuracy.
 Full packet low-frequency/seam/interpolation handoff, actual force/startup/motion
 comparison, performance and broader MATLAB compatibility remain separate. No
 runtime pin or upstream promotion.
+
+## Candidate component-view integration (not yet executed)
+
+An optional `hydro_coeffs.excitation.component_view` in the public hydro struct
+keeps a separately derived excitation table without changing raw hydro data.
+Fields are `omega_rad_s`, `headings_deg`, and normalized real `re`, `im`, `md`
+arrays [DOF,heading,frequency]. The view is selected only for fixed linear
+six-DOF FullDir excitation; mean drift must be zero in both raw and derived
+tables. Unsupported combinations and incomplete/nonfinite/nonperiodic views
+fail clearly. Wave frequency and direction queries must be exact view nodes.
+Absent views retain the existing raw-data path. No low-frequency interpolation
+policy is added to WEC-Sim: callers supply coefficients on their own nodes.
+
+The initializer uses the selected excitation axes for wave coverage, while
+radiation continues using the original raw grid, A/B, IRF and Ainf. FullDir
+preparation consumes the view directly and avoids mutating raw heading arrays.
+`componentExcitationViewTest.m` adds4 controls for below-raw-band/off-raw-heading
+queries, exact nodes, invalid/unsupported data, whole raw-hydro preservation and
+legacy fallback. Its scalar reference checks the actual native harmonic function.
+An additional phase control verifies that explicitly supplied phases leave the
+global random state unchanged: their validated branch returns before RNG setup,
+while missing-phase seeded/random behavior remains unchanged. The current14
+controls (original9, this RNG control and4 view controls) must be rerun on the
+integration delta.
+
+The official writer also permits absent excitation-IRF data when all3 fields
+`ex_K`, `ex_t`, `ex_w` are absent; a partial set is fatal before file writing.
+The all-present legacy path is unchanged. This supports native spectral inputs
+without constructing an unused excitation IRF or fabricating radiation data.
+Coefficient-only/legacy/partial-field readback controls are coordinated with the
+Topwater BEMIO handoff tests. Full packet/native bus/startup precede motion;
+no simple-boat qualification or new performance claim follows from this source.

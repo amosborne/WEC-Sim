@@ -55,6 +55,16 @@ testCase.verifySize(first.phase,[3 2]);
 testCase.verifyEqual(first.phase,second.phase);
 end
 
+function testSuppliedPhasesLeaveGlobalRandomStateUnchanged(testCase)
+fixture = fullDirectionalSpectralFixture(testCase.TestData.folder,[0;90],true);
+waves = fixture_wave(fixture);
+before = rng;
+waves.setup(fixture.omega','infinite',0,fixture.dt,numel(fixture.time)-1, ...
+    fixture.time',fixture.g,fixture.rho);
+testCase.verifyEqual(rng,before);
+testCase.verifyEqual(waves.phase,fixture.phases);
+end
+
 function waves = fixture_wave(fixture)
 waves = waveClass('spectrumImportFullDir');
 waves.spectrumFile = fixture.file;

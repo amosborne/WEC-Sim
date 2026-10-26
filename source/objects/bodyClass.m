@@ -1021,6 +1021,36 @@ classdef bodyClass<handle
             % Used by hydroForcePre
             hfName = ['hf' num2str(iH)];
             nDOF = obj.dof;
+            selected = getExcitationData(obj.hydroData(iH),'spectrumImportFullDir');
+            if selected.uses_component_view
+                if isempty(dirBins) || obj.yaw.option ~= 0 || obj.variableHydro.option ~= 0 || ...
+                        nDOF ~= 6 || obj.meanDrift ~= 0 || obj.nonlinearHydro ~= 0
+                    error('WECsim:UnsupportedExcitationView', ...
+                        'Component views require fixed linear six-DOF FullDir excitation and zero mean drift.');
+                end
+                if ~isvector(wv) || any(~isfinite(wv)) || any(diff(wv(:)) <= 0) || ...
+                        ~iscolumn(dirBins) || numel(dirBins) < 2 || any(~isfinite(dirBins)) || ...
+                        any(diff(dirBins) <= 0)
+                    error('WECsim:InvalidExcitationView','Component waves require increasing frequencies and a sorted direction column.');
+                end
+                [present,index] = ismember(wv(:),selected.w(:));
+                if ~all(present) || any(~ismember(dirBins(:),selected.direction(:)))
+                    error('WECsim:InvalidExcitationView','Native wave frequencies and directions must be exact component-view nodes.');
+                end
+                [dofGrid,dirGrid,wGrid] = ndgrid(1:nDOF,selected.direction,wv);
+                obj.hydroForce.(hfName).fExt.dofGrd = dofGrid;
+                obj.hydroForce.(hfName).fExt.dirGrd = dirGrid;
+                obj.hydroForce.(hfName).fExt.wGrd = wGrid;
+                [obj.hydroForce.(hfName).fExt.qDofGrd,~,obj.hydroForce.(hfName).fExt.qWGrd] = ...
+                    ndgrid(1:nDOF,dirBins,wv);
+                obj.hydroForce.(hfName).fExt.fEHRE = selected.re(:,:,index).*rho.*g;
+                obj.hydroForce.(hfName).fExt.fEHIM = selected.im(:,:,index).*rho.*g;
+                obj.hydroForce.(hfName).fExt.fEHMD = selected.mean_drift(:,:,index).*rho.*g;
+                obj.hydroForce.(hfName).fExt.re = zeros(numel(direction),bemCount,nDOF);
+                obj.hydroForce.(hfName).fExt.im = zeros(numel(direction),bemCount,nDOF);
+                obj.hydroForce.(hfName).fExt.md = zeros(numel(direction),bemCount,nDOF);
+                return
+            end
             re = obj.hydroData(iH).hydro_coeffs.excitation.re(:,:,:) .*rho.*g;
             im = obj.hydroData(iH).hydro_coeffs.excitation.im(:,:,:) .*rho.*g;
             md = obj.hydroData(iH).hydro_coeffs.mean_drift(:,:,:)    .*rho.*g;

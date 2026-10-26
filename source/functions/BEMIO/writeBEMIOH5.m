@@ -1,4 +1,8 @@
 function writeBEMIOH5(hydro)
+excitationIRF = isfield(hydro,{'ex_K','ex_t','ex_w'});
+if any(excitationIRF) && ~all(excitationIRF)
+    error('WECsim:IncompleteExcitationIRF','Excitation IRF requires all ex_K, ex_t and ex_w fields, or none.');
+end
 % Writes the hydro data structure to a .h5 file.
 %
 % See ``WEC-Sim\tutorials\BEMIO`` for examples of usage.
@@ -85,9 +89,11 @@ for i = 1:hydro.Nb
     writeH5Parameter(filename,['/body' num2str(i) '/hydro_coeffs/excitation/froude-krylov/mag'],permute(hydro.fk_ma((n+1):(n+m),:,:),[3 2 1]),'Magnitude of Froude-Krylov force (normalized by rho*g)','N');
     writeH5Parameter(filename,['/body' num2str(i) '/hydro_coeffs/excitation/froude-krylov/phase'],permute(hydro.fk_ph((n+1):(n+m),:,:),[3 2 1]),'Phase angle of Froude-Krylov force','rad');
     writeH5Parameter(filename,['/body' num2str(i) '/hydro_coeffs/excitation/froude-krylov/re'],permute(hydro.fk_re((n+1):(n+m),:,:),[3 2 1]),'Real component of Froude-Krylov force (normalized by rho*g)','N');
-    writeH5Parameter(filename,['/body' num2str(i) '/hydro_coeffs/excitation/impulse_response_fun/f'],permute(hydro.ex_K((n+1):(n+m),:,:),[3 2 1]),'Impulse response function','');
-    writeH5Parameter(filename,['/body' num2str(i) '/hydro_coeffs/excitation/impulse_response_fun/t'],hydro.ex_t,'Time vector for the impulse resonse function','s');
-    writeH5Parameter(filename,['/body' num2str(i) '/hydro_coeffs/excitation/impulse_response_fun/w'],hydro.ex_w,'Interpolated frequencies used to compute the impulse response function','rad/s');
+    if all(excitationIRF)
+        writeH5Parameter(filename,['/body' num2str(i) '/hydro_coeffs/excitation/impulse_response_fun/f'],permute(hydro.ex_K((n+1):(n+m),:,:),[3 2 1]),'Impulse response function','');
+        writeH5Parameter(filename,['/body' num2str(i) '/hydro_coeffs/excitation/impulse_response_fun/t'],hydro.ex_t,'Time vector for the impulse resonse function','s');
+        writeH5Parameter(filename,['/body' num2str(i) '/hydro_coeffs/excitation/impulse_response_fun/w'],hydro.ex_w,'Interpolated frequencies used to compute the impulse response function','rad/s');
+    end
 
     % Write QTFs data if available
     if isfield(hydro, 'QTFs') && ~isempty(hydro.QTFs(i).Diff)
