@@ -1,4 +1,4 @@
-# Rigid Hydro product ordering — draft for issue #3
+# Rigid Hydro product ordering — issue #3
 
 The active Rigid Hydro File Solid receives products in `[Ixy Ixz Iyz]` order,
 while File Solid expects `[Iyz Izx Ixy]`. When the first and third products
@@ -8,11 +8,12 @@ at `Rigid Body/Hydrodynamic Body/Structure/Body Properties`.
 Public properties, signs, mass adjustment and residual added mass stay unchanged.
 Drag and Flex are outside this draft.
 
-**Draft status: no corrected library binary is included.** The release SLX is
-unchanged. The supported-API export recipe and the packaged test layout have not
-run in this branch. `testLibraryBoundaryIsCorrected` deliberately fails until an
-independently audited narrow SLX correction is present. This must not be merged
-as a complete fix or used to move a production pin.
+The corrected library is included. Strict archive comparisons found exactly one
+changed expression and no other model content or metadata changes. A fresh
+MATLAB load verified the exact property, original lock and R2020b metadata,
+without changing file bytes. The portable packaging helper reproduced the same
+candidate. Native tests on this proposed head remain pending; the PR remains a
+draft and no production dependency pin has moved.
 
 ## Minimal same-input example
 
@@ -66,18 +67,39 @@ Added mass is water inertia; its numerical partition introduces no damping.
 [Committed measured evidence and limits](https://github.com/amosborne/topwater/blob/9a922f1b7e1941c6b035c727794487cd2ca000f4/docs/experts/wecsim_expert/inertia-adjustment-proof-2026-10-25.md).
 Raw private run directories referenced there are local evidence, not fork links.
 
-## Remaining narrow binary gate
+## Reproduce the narrow library change
 
-`tests/helpers/prepareRigidHydroInertiaLibrary.m` proposes direct supported-API
-R2020b exports of an untouched control and one-property candidate into separate
-private copies. It makes no intermediate R2025b save or original overwrite.
-`auditRigidHydroInertiaLibrary.py` must accept the original/control comparison
-with zero changes, and original/candidate with exactly the active rigid product
-expression change. Every other archive semantic must remain unchanged, including
-release metadata. No serializer whitelist or Drag/Flex edit is permitted.
+Start with the stock release library in a separate checkout. Use absolute paths,
+fresh output directories and an isolated MATLAB process. Python 3 with SciPy is
+needed to read the MATLAB preparation receipt; ZIP/XML handling uses the standard
+library.
 
-Only after both audits, reopen and rerun the focused native regressions, then
-independently review and promote that exact binary. Existing unrelated
-serialization failures are preserved; this recipe has not established that
-R2025b can produce the required narrow export. A no-op export alone would not
-prove physical equivalence. Actual R2020b runtime compatibility is untested.
+1. Add `tests/helpers` to the MATLAB path and run
+   `prepareRigidHydroInertiaLibrary(stockLibrary,apiOutputDirectory)`. The supported
+   API authors and reopens the new property, and preserves the original file.
+   Direct R2020b export changed 53 unrelated entries in both control and candidate
+   in our R2025b run, so those exports must not replace the shipped library.
+2. Extract only the API-verified property onto the original archive:
+
+   ```text
+   python tests/helpers/extractRigidHydroInertiaDelta.py --stock ABS_STOCK_SLX --api-control ABS_API_OUTPUT/export-control/WECSim_Lib_Body_Elements.slx --api-candidate ABS_API_OUTPUT/export-candidate/WECSim_Lib_Body_Elements.slx --api-receipt ABS_API_OUTPUT/preparation.mat --api-source ABS_FORK/tests/helpers/prepareRigidHydroInertiaLibrary.m --output ABS_NEW_DELTA_OUTPUT
+   ```
+
+   This preserves the original XML encoding and every other uncompressed entry
+   byte, entry order and non-derived archive metadata. Derived compressed sizes
+   and offsets can change and are reported. Runtime hashes identify all supplied
+   files; the preparation receipt records execution provenance, rather than
+   authenticating historical file bytes.
+3. Run `auditRigidHydroInertiaLibrary.py --stock ABS_STOCK_SLX --candidate
+   ABS_GENERATED_SLX --mode control --report ABS_NEW_REPORT` for the generated
+   control, then with `--mode candidate` for the candidate. Require zero versus
+   exactly one intended change, no unexplained/added/removed entries, and original
+   R2020b metadata. No serializer whitelist or Drag/Flex edit is permitted.
+4. Load the candidate by absolute path in a fresh MATLAB process. Check its exact
+   `FileName`, expected property, `Lock` on, `Dirty` off and
+   `Simulink.MDLInfo(file).ReleaseName`. Close without saving and verify unchanged
+   bytes. Then run the focused native tests above on the exact proposed revision.
+
+The measured extraction passed both unchanged audits, and the portable helper
+reproduced the identical candidate. Actual R2020b runtime compatibility remains
+untested; the archive label alone does not establish it.
