@@ -596,6 +596,21 @@ classdef waveClass<handle
         function setWavePhase(obj)
             % Sets the irregular wave's random phase
             % used by: :meth:`waveClass.setup`.
+            if strcmp(obj.bem.option,'ImportedFullDir')
+                data = importdata(obj.spectrumFile);
+                if isfield(data,'phase')
+                    expectedSize = [numel(data.frequencies),numel(data.directions)];
+                    if ~isnumeric(data.phase) || ~isreal(data.phase) || ...
+                            ~isequal(size(data.phase),expectedSize) || any(~isfinite(data.phase),'all')
+                        error('WECsim:InvalidFullDirectionalPhase', ...
+                            'Full directional phase must be a finite real frequency-by-direction matrix.');
+                    end
+                    freqLoc = data.frequencies >= min(obj.bem.range)/2/pi & ...
+                        data.frequencies <= max(obj.bem.range)/2/pi;
+                    obj.phase = data.phase(freqLoc,:);
+                    return
+                end
+            end
             if obj.phaseSeed ~= 0
                 s = RandStream('Threefry', 'Seed', 1);  % Global fixed seed
                 s.Substream = obj.phaseSeed;           % Substream based on phaseSeed

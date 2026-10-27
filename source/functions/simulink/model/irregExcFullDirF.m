@@ -86,8 +86,14 @@ end
 
 B1= sin(bsxfun(@plus,A1,phaseRand(:,:,1)));
 B11 = sin(bsxfun(@plus,omega*time,phaseRand(:,:,1)));
-C0 = bsxfun(@times,amplitude,dOmega);
-C1 = sqrt(bsxfun(@times,amplitude,dOmega));
+% Match waveClass's existing directional-density integration rule.
+dTheta = zeros(1,numel(directions));
+dTheta(1) = deg2rad(directions(2)-directions(1));
+dTheta(2:end-1) = deg2rad((directions(3:end)-directions(1:end-2))/2);
+dTheta(end) = deg2rad(directions(end)-directions(end-1));
+weightedAmplitude = bsxfun(@times,amplitude,dTheta);
+C0 = bsxfun(@times,weightedAmplitude,dOmega);
+C1 = sqrt(bsxfun(@times,weightedAmplitude,dOmega));
 for k=1:size(dofGRD,1)
     D0 =bsxfun(@times,fExtMDint(:,:,k).',C0);
     D1 =bsxfun(@times,fExtREint(:,:,k).',C1);
