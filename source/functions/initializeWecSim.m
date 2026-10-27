@@ -252,18 +252,17 @@ if any(hydroBodLogic == 1)
     % parameters.
     for iW = 1:length(waves)
         hdIndex = body(1).variableHydro.hydroForceIndexInitial;
-        excitationData = getExcitationData(body(1).hydroData(hdIndex),waves(iW).type);
-        waves(iW).setup(excitationData.w, body(1).hydroData(hdIndex).simulation_parameters.waterDepth, simu.rampTime, simu.dt, simu.maxIt, simu.time, simu.gravity, simu.rho);
+        waves(iW).setup(body(1).hydroData(hdIndex).simulation_parameters.w, body(1).hydroData(hdIndex).simulation_parameters.waterDepth, simu.rampTime, simu.dt, simu.maxIt, simu.time, simu.gravity, simu.rho);
         % Check that direction and freq are within range of hydro data
-        if  min(waves(iW).direction) <  min(excitationData.direction) || max(waves(iW).direction) >  max(excitationData.direction)
+        if  min(waves(iW).direction) <  min(body(1).hydroData(hdIndex).simulation_parameters.direction) || max(waves(iW).direction) >  max(body(1).hydroData(hdIndex).simulation_parameters.direction)
             error('waves(%d).direction outside of range of available hydro data',iW)
         end
         if strcmp(waves(iW).type,'elevationImport')~=1 && strcmp(waves(iW).type,'noWave')~=1 && strcmp(waves(iW).type,'noWaveCIC')~=1
-            if  min(waves(iW).omega) <  min(excitationData.w) || max(waves(iW).omega) >  max(excitationData.w)
+            if  min(waves(iW).omega) <  min(body(1).hydroData(hdIndex).simulation_parameters.w) || max(waves(iW).omega) >  max(body(1).hydroData(hdIndex).simulation_parameters.w)
                 error('waves(%d).omega outside of range of available hydro data',iW)
             end
         end
-    end; clear iW excitationData
+    end; clear iW
 else
     % When no hydro bodies (and no .h5) are present, define the wave using
     % input file parameters
